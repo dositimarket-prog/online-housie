@@ -16,12 +16,34 @@ function TicketSelector({ isOpen, onClose, maxTickets, onConfirm, initialSelecte
   }, [])
 
   const handleTicketSelect = (ticket) => {
-    if (selectedTickets.find(t => t.id === ticket.id)) {
-      // Deselect
-      setSelectedTickets(selectedTickets.filter(t => t.id !== ticket.id))
-    } else if (selectedTickets.length < maxTickets) {
-      // Select
-      setSelectedTickets([...selectedTickets, ticket])
+    // Find the pair partner for this ticket (1&2, 3&4, 5&6, etc.)
+    const getPairPartnerId = (id) => {
+      // If odd (1, 3, 5...), partner is id + 1
+      // If even (2, 4, 6...), partner is id - 1
+      return id % 2 === 1 ? id + 1 : id - 1
+    }
+
+    const partnerId = getPairPartnerId(ticket.id)
+    const partnerTicket = availableTickets.find(t => t.id === partnerId)
+
+    const isCurrentlySelected = selectedTickets.find(t => t.id === ticket.id)
+
+    if (isCurrentlySelected) {
+      // Deselect both this ticket and its pair partner
+      setSelectedTickets(selectedTickets.filter(t => t.id !== ticket.id && t.id !== partnerId))
+    } else {
+      // Check if we have room for both tickets
+      const partnerAlreadySelected = selectedTickets.find(t => t.id === partnerId)
+      const ticketsToAdd = partnerAlreadySelected ? 1 : 2 // If partner is already selected, only add 1
+
+      if (selectedTickets.length + ticketsToAdd <= maxTickets) {
+        // Select both this ticket and its pair partner (if not already selected)
+        const newSelection = [...selectedTickets, ticket]
+        if (partnerTicket && !partnerAlreadySelected) {
+          newSelection.push(partnerTicket)
+        }
+        setSelectedTickets(newSelection)
+      }
     }
   }
 
@@ -43,6 +65,9 @@ function TicketSelector({ isOpen, onClose, maxTickets, onConfirm, initialSelecte
               <p className="text-sm text-gray-600 mt-1">
                 Choose up to {maxTickets} ticket{maxTickets > 1 ? 's' : ''} • {selectedTickets.length} / {maxTickets} selected
               </p>
+              <p className="text-xs text-blue-600 mt-1">
+                💡 Tickets are paired (1&2, 3&4, etc.) - selecting one automatically selects its pair
+              </p>
             </div>
             <button
               onClick={onClose}
@@ -58,16 +83,28 @@ function TicketSelector({ isOpen, onClose, maxTickets, onConfirm, initialSelecte
         {/* Tickets Grid */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {availableTickets.map((ticket) => (
-              <Ticket
-                key={ticket.id}
-                ticket={ticket.numbers}
-                ticketNumber={ticket.id}
-                selected={selectedTickets.find(t => t.id === ticket.id)}
-                onSelect={() => handleTicketSelect(ticket)}
-                size="small"
-              />
-            ))}
+            {availableTickets.map((ticket) => {
+              // Determine if this is the first ticket in a pair (odd ID)
+              const isFirstInPair = ticket.id % 2 === 1
+              const partnerId = ticket.id % 2 === 1 ? ticket.id + 1 : ticket.id - 1
+
+              return (
+                <div key={ticket.id} className="relative">
+                  {isFirstInPair && (
+                    <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium z-10">
+                      Pair {Math.ceil(ticket.id / 2)}
+                    </div>
+                  )}
+                  <Ticket
+                    ticket={ticket.numbers}
+                    ticketNumber={ticket.id}
+                    selected={selectedTickets.find(t => t.id === ticket.id)}
+                    onSelect={() => handleTicketSelect(ticket)}
+                    size="small"
+                  />
+                </div>
+              )
+            })}
           </div>
         </div>
 
