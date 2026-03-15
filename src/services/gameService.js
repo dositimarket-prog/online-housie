@@ -86,7 +86,7 @@ export async function validateGameCode(gameCode) {
   try {
     const { data: game, error } = await supabase
       .from('games')
-      .select('id, game_code, status, max_players')
+      .select('id, game_code, status, max_players, host_name, game_title')
       .eq('game_code', gameCode)
       .single()
 
@@ -110,7 +110,12 @@ export async function validateGameCode(gameCode) {
       }
     }
 
-    return { valid: true, gameId: game.id }
+    return {
+      valid: true,
+      gameId: game.id,
+      hostName: game.host_name,
+      gameTitle: game.game_title
+    }
   } catch (error) {
     console.error('Error validating game code:', error)
     return { valid: false, error: error.message }

@@ -8,6 +8,7 @@ function Landing() {
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [errors, setErrors] = useState({})
+  const [gameData, setGameData] = useState(null)
 
   const handleJoinClick = async () => {
     if (!gameCode.trim()) {
@@ -22,6 +23,11 @@ function Landing() {
       return
     }
 
+    // Store game data for display in modal
+    setGameData({
+      hostName: validation.hostName,
+      gameTitle: validation.gameTitle
+    })
     setErrors({})
     setShowJoinModal(true)
   }
@@ -48,6 +54,7 @@ function Landing() {
     setShowJoinModal(false)
     setPlayerName('')
     setErrors({})
+    setGameData(null)
   }
 
   return (
@@ -149,6 +156,20 @@ function Landing() {
                   readOnly
                 />
               </div>
+
+              {gameData && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-sm text-gray-600 mb-1">
+                    {gameData.gameTitle && (
+                      <div className="font-medium text-gray-900 mb-1">{gameData.gameTitle}</div>
+                    )}
+                    <div className="flex items-center gap-1">
+                      <span>Hosted by</span>
+                      <span className="font-medium text-gray-900">{gameData.hostName}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-900 mb-2">

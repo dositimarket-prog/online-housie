@@ -1,7 +1,7 @@
 /**
  * Ticket component - Displays a housie/tambola ticket
  */
-function Ticket({ ticket, ticketNumber, selected, onSelect, size = 'normal', markedNumbers = [] }) {
+function Ticket({ ticket, ticketNumber, selected, onSelect, size = 'normal', markedNumbers = [], onCellClick = null }) {
   const isSmall = size === 'small'
   const isTiny = size === 'tiny'
 
@@ -12,24 +12,31 @@ function Ticket({ ticket, ticketNumber, selected, onSelect, size = 'normal', mar
         bg-white rounded-lg border-2 transition-all
         ${selected ? 'border-gray-900 shadow-lg' : 'border-gray-200 hover:border-gray-400'}
         ${onSelect ? 'cursor-pointer' : ''}
-        ${isSmall ? 'p-2' : isTiny ? 'p-1' : 'p-4'}
+        ${isSmall ? 'p-2' : isTiny ? 'p-1' : 'p-2 sm:p-4'}
       `}
     >
       {ticketNumber && (
-        <div className={`text-center font-semibold text-gray-900 ${isSmall ? 'text-xs mb-1' : isTiny ? 'text-xs mb-0.5' : 'text-sm mb-2'}`}>
+        <div className={`text-center font-semibold text-gray-900 ${isSmall ? 'text-xs mb-1' : isTiny ? 'text-xs mb-0.5' : 'text-xs sm:text-sm mb-1 sm:mb-2'}`}>
           Ticket #{ticketNumber}
         </div>
       )}
 
-      <div className={`grid grid-cols-9 ${isSmall ? 'gap-0.5' : isTiny ? 'gap-0' : 'gap-1'}`}>
+      <div className={`grid grid-cols-9 ${isSmall ? 'gap-0.5' : isTiny ? 'gap-0' : 'gap-0.5 sm:gap-1'}`}>
         {ticket.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
             const isMarked = markedNumbers && markedNumbers.includes(cell)
+            const canClick = onCellClick && cell !== null
             return (
               <div
                 key={`${rowIndex}-${colIndex}`}
+                onClick={(e) => {
+                  if (canClick) {
+                    e.stopPropagation() // Prevent triggering onSelect
+                    onCellClick(cell)
+                  }
+                }}
                 className={`
-                  ${isSmall ? 'h-6 w-6 text-xs' : isTiny ? 'h-4 w-4 text-[10px]' : 'h-10 w-10 text-sm'}
+                  ${isSmall ? 'h-6 w-6 text-xs' : isTiny ? 'h-4 w-4 text-[10px]' : 'h-7 w-7 sm:h-10 sm:w-10 text-xs sm:text-sm'}
                   flex items-center justify-center font-semibold rounded
                   ${cell === null
                     ? 'bg-gray-50'
@@ -38,6 +45,7 @@ function Ticket({ ticket, ticketNumber, selected, onSelect, size = 'normal', mar
                       : 'bg-gray-100 text-gray-900'
                   }
                   ${cell !== null && !isMarked ? 'border border-gray-200' : ''}
+                  ${canClick ? 'cursor-pointer hover:bg-gray-200 active:bg-gray-300 transition-colors' : ''}
                 `}
               >
                 {cell !== null && cell}

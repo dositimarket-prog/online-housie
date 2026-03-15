@@ -77,6 +77,36 @@ export async function getMyTickets(gameId) {
 }
 
 /**
+ * Get all tickets for all players (host only)
+ * @param {string} gameId - Game ID
+ * @returns {Promise<Object>} All tickets grouped by player
+ */
+export async function getAllTickets(gameId) {
+  try {
+    // Get all tickets with player information
+    const { data: tickets, error: ticketsError } = await supabase
+      .from('tickets')
+      .select(`
+        *,
+        player:players(id, player_name, is_host)
+      `)
+      .eq('game_id', gameId)
+      .order('player_id')
+      .order('ticket_number')
+
+    if (ticketsError) throw ticketsError
+
+    return {
+      success: true,
+      tickets: tickets || []
+    }
+  } catch (error) {
+    console.error('Error fetching all tickets:', error)
+    return { success: false, error: error.message, tickets: [] }
+  }
+}
+
+/**
  * Call a number (host only)
  * @param {string} gameId - Game ID
  * @param {number} number - Number to call
@@ -118,7 +148,7 @@ export async function callNumber(gameId, number) {
 }
 
 /**
- * Claim a prize
+ * Submit a claim request for a prize (for host verification)
  * @param {string} gameId - Game ID
  * @param {string} playerId - Player ID
  * @param {string} prizeId - Prize ID
@@ -128,26 +158,217 @@ export async function callNumber(gameId, number) {
  */
 export async function claimPrize(gameId, playerId, prizeId, ticketId, prizeType) {
   try {
-    // Update the prize with winner info
-    const { error: updateError } = await supabase
+    // Check if prize is already claimed
+    const { data: prize, error: prizeError } = await supabase
+      .from('prizes')
+      .select('claimed')
+      .eq('id', prizeId)
+      .single()
+
+    if (prizeError) throw prizeError
+
+    if (prize.claimed) {
+      return { success: false, error: 'Prize already claimed' }
+    }
+
+    // Check if player already has a pending claim for this prize
+    const { data: existingClaim, error: checkError } = await supabase
+      .from('claim_requests')
+      .select('id')
+      .eq('game_id', gameId)
+      .eq('player_id', playerId)
+      .eq('prize_id', prizeId)
+      .eq('status', 'pending')
+      .single()
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      throw checkError
+    }
+
+    if (existingClaim) {
+      return { success: false, error: 'You already have a pending claim for this prize' }
+    }
+
+    // Insert claim request
+    const { error: insertError } = await supabase
+      .from('claim_requests')
+      .insert({
+        game_id: gameId,
+        player_id: playerId,
+        prize_id: prizeId,
+        ticket_id: ticketId,
+        status: 'pending'
+      })
+
+    if (insertError) throw insertError
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error submitting claim request:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Get pending claim requests for a game (host only)
+ * @param {string} gameId - Game ID
+ * @returns {Promise<Object>} Claim requests with player and prize info and all player tickets
+ */
+export async function getClaimRequests(gameId) {
+  try {
+    const { data: claims, error } = await supabase
+      .from('claim_requests')
+      .select(`
+        *,
+        player:players(id, player_name),
+        prize:prizes(id, name),
+        ticket:tickets(id, ticket_number, numbers)
+      `)
+      .eq('game_id', gameId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    // Get all unique player IDs from claims
+    const playerIds = [...new Set(claims.map(claim => claim.player?.id).filter(Boolean))]
+
+    // Fetch all tickets for these players
+    const { data: allTickets, error: ticketsError } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('game_id', gameId)
+      .in('player_id', playerIds)
+      .order('ticket_number')
+
+    if (ticketsError) throw ticketsError
+
+    // Group tickets by player ID
+    const ticketsByPlayer = (allTickets || []).reduce((acc, ticket) => {
+      if (!acc[ticket.player_id]) {
+        acc[ticket.player_id] = []
+      }
+      acc[ticket.player_id].push(ticket)
+      return acc
+    }, {})
+
+    // Add all tickets to each claim's player data
+    const claimsWithAllTickets = claims.map(claim => ({
+      ...claim,
+      player: {
+        ...claim.player,
+        allTickets: ticketsByPlayer[claim.player?.id] || []
+      }
+    }))
+
+    return {
+      success: true,
+      claims: claimsWithAllTickets
+    }
+  } catch (error) {
+    console.error('Error fetching claim requests:', error)
+    return { success: false, error: error.message, claims: [] }
+  }
+}
+
+/**
+ * Approve a claim request (host only)
+ * @param {string} claimId - Claim request ID
+ * @param {string} prizeId - Prize ID
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Result
+ */
+export async function approveClaim(claimId, prizeId, playerId) {
+  try {
+    // Update the prize to mark it as claimed
+    const { error: prizeError } = await supabase
       .from('prizes')
       .update({
         claimed: true,
         claimed_by: playerId,
-        claimed_ticket_id: ticketId,
         claimed_at: new Date().toISOString()
       })
       .eq('id', prizeId)
-      .eq('game_id', gameId)
-      .eq('claimed', false) // Only update if not already claimed
 
-    if (updateError) throw updateError
+    if (prizeError) throw prizeError
+
+    // Update the claim request status to approved
+    const { error: claimError } = await supabase
+      .from('claim_requests')
+      .update({
+        status: 'approved',
+        verified_at: new Date().toISOString()
+      })
+      .eq('id', claimId)
+
+    if (claimError) throw claimError
 
     return { success: true }
   } catch (error) {
-    console.error('Error claiming prize:', error)
+    console.error('Error approving claim:', error)
     return { success: false, error: error.message }
   }
+}
+
+/**
+ * Reject a claim request (host only)
+ * @param {string} claimId - Claim request ID
+ * @returns {Promise<Object>} Result
+ */
+export async function rejectClaim(claimId) {
+  try {
+    // Update the claim request status to rejected
+    const { error } = await supabase
+      .from('claim_requests')
+      .update({
+        status: 'rejected',
+        verified_at: new Date().toISOString()
+      })
+      .eq('id', claimId)
+
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error rejecting claim:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Subscribe to claim requests updates
+ * @param {string} gameId - Game ID
+ * @param {Function} callback - Callback function when claim requests change
+ * @returns {Object} Subscription object
+ */
+export function subscribeToClaimRequests(gameId, callback) {
+  console.log('[ClaimRequests] Setting up subscription for game:', gameId)
+
+  const subscription = supabase
+    .channel(`claim-requests-${gameId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'claim_requests',
+        filter: `game_id=eq.${gameId}`
+      },
+      async (payload) => {
+        console.log('[ClaimRequests] Change detected:', payload)
+        // Fetch updated claim requests with full details
+        const result = await getClaimRequests(gameId)
+        if (result.success) {
+          console.log('[ClaimRequests] Fetched updated claims:', result.claims.length)
+          callback(result.claims)
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('[ClaimRequests] Subscription status:', status)
+    })
+
+  return subscription
 }
 
 /**

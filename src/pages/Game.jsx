@@ -6,8 +6,12 @@ import {
   getMyTickets,
   callNumber,
   claimPrize,
+  getClaimRequests,
+  approveClaim,
+  rejectClaim,
   subscribeToGameUpdates,
-  subscribeToPrizes
+  subscribeToPrizes,
+  subscribeToClaimRequests
 } from '../services/gamePlayService'
 
 function Game() {
@@ -19,13 +23,27 @@ function Game() {
   const [prizes, setPrizes] = useState([])
   const [currentPlayer, setCurrentPlayer] = useState(null)
   const [myTickets, setMyTickets] = useState([])
+  const [claimRequests, setClaimRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [calledNumbers, setCalledNumbers] = useState([])
   const [currentNumber, setCurrentNumber] = useState(null)
-  const [currentPrize, setCurrentPrize] = useState(null)
+  const [manuallyMarkedNumbers, setManuallyMarkedNumbers] = useState([])
 
   // Determine if user is host
   const isHost = currentPlayer?.is_host ?? false
+
+  // Toggle manual marking for players
+  const toggleNumberMark = (number) => {
+    if (isHost) return // Host doesn't manually mark
+
+    setManuallyMarkedNumbers(prev => {
+      if (prev.includes(number)) {
+        return prev.filter(n => n !== number)
+      } else {
+        return [...prev, number]
+      }
+    })
+  }
 
   // Fetch initial data
   useEffect(() => {
@@ -40,15 +58,19 @@ function Game() {
           setPrizes(gameResult.game.prizes || [])
           setCalledNumbers(gameResult.game.called_numbers || [])
 
-          // Set current prize (first unclaimed)
-          const firstUnclaimed = gameResult.game.prizes.find(p => !p.claimed)
-          setCurrentPrize(firstUnclaimed || gameResult.game.prizes[0])
-
-          // Fetch my tickets
+          // Fetch my tickets and player info
           const ticketsResult = await getMyTickets(gameResult.game.id)
           if (ticketsResult.success) {
             setCurrentPlayer(ticketsResult.player)
             setMyTickets(ticketsResult.tickets)
+
+            // If host, also fetch claim requests
+            if (ticketsResult.player.is_host) {
+              const claimsResult = await getClaimRequests(gameResult.game.id)
+              if (claimsResult.success) {
+                setClaimRequests(claimsResult.claims)
+              }
+            }
           }
         }
       } catch (error) {
@@ -77,18 +99,23 @@ function Game() {
     // Subscribe to prize updates
     const prizesSubscription = subscribeToPrizes(gameData.id, (updatedPrizes) => {
       setPrizes(updatedPrizes)
-
-      // Update current prize
-      const firstUnclaimed = updatedPrizes.find(p => !p.claimed)
-      setCurrentPrize(firstUnclaimed || updatedPrizes[0])
     })
+
+    // Subscribe to claim requests (host only)
+    let claimsSubscription = null
+    if (isHost) {
+      claimsSubscription = subscribeToClaimRequests(gameData.id, (updatedClaims) => {
+        setClaimRequests(updatedClaims)
+      })
+    }
 
     // Cleanup subscriptions
     return () => {
       gameSubscription?.unsubscribe()
       prizesSubscription?.unsubscribe()
+      claimsSubscription?.unsubscribe()
     }
-  }, [gameData?.id])
+  }, [gameData?.id, isHost])
 
   // Generate next random number
   const callNextNumber = async () => {
@@ -125,7 +152,7 @@ function Game() {
     const prize = prizes.find(p => p.id === prizeId)
     if (!prize) return
 
-    // Claim prize in database
+    // Submit claim request to host
     const result = await claimPrize(
       gameData.id,
       currentPlayer.id,
@@ -135,12 +162,45 @@ function Game() {
     )
 
     if (result.success) {
-      alert(`You claimed ${prize.name}!`)
+      alert(`Claim submitted for ${prize.name}!\nWaiting for host verification.`)
     } else {
-      console.error('Error claiming prize:', result.error)
-      alert('Failed to claim prize. It may have already been claimed.')
+      console.error('Error submitting claim:', result.error)
+      if (result.error === 'Prize already claimed') {
+        alert('This prize has already been claimed by another player.')
+      } else if (result.error === 'You already have a pending claim for this prize') {
+        alert('You already submitted a claim for this prize. Waiting for host verification.')
+      } else {
+        alert('Failed to submit claim. Please try again.')
+      }
     }
-    // Real-time subscription will update the prizes list
+  }
+
+  const handleApproveClaim = async (claimId, prizeId, playerId) => {
+    if (!isHost) return
+
+    const result = await approveClaim(claimId, prizeId, playerId)
+
+    if (result.success) {
+      // Success - subscription will update the UI automatically
+      console.log('Claim approved successfully')
+    } else {
+      console.error('Error approving claim:', result.error)
+      alert('Failed to approve claim. Please try again.')
+    }
+  }
+
+  const handleRejectClaim = async (claimId) => {
+    if (!isHost) return
+
+    const result = await rejectClaim(claimId)
+
+    if (result.success) {
+      // Success - subscription will update the UI automatically
+      console.log('Claim rejected successfully')
+    } else {
+      console.error('Error rejecting claim:', result.error)
+      alert('Failed to reject claim. Please try again.')
+    }
   }
 
   // Show loading state
@@ -179,12 +239,12 @@ function Game() {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Host Controls - Top Section */}
         {isHost && (
-          <div className="mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between gap-4">
+          <div className="mb-4 sm:mb-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900 mb-1">Host Controls</h3>
                   <p className="text-sm text-gray-600">
@@ -194,7 +254,7 @@ function Game() {
                 <button
                   onClick={callNextNumber}
                   disabled={calledNumbers.length >= 90}
-                  className={`px-8 py-4 rounded-lg font-medium text-lg transition-colors ${
+                  className={`w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-base sm:text-lg transition-colors ${
                     calledNumbers.length < 90
                       ? 'bg-gray-900 text-white hover:bg-gray-800'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -207,65 +267,120 @@ function Game() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Column - Number Board & Called Numbers */}
           <div className="lg:col-span-2 space-y-6">
             {/* Current Number */}
             {currentNumber && (
-              <div className="bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl p-8 text-center">
+              <div className="bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl p-6 sm:p-8 text-center">
                 <p className="text-white text-sm font-medium mb-2">Current Number</p>
-                <div className="text-white text-8xl font-bold">{currentNumber}</div>
+                <div className="text-white text-6xl sm:text-8xl font-bold">{currentNumber}</div>
               </div>
             )}
 
-            {/* Number Board (1-90) */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Number Board</h3>
-              <div className="grid grid-cols-9 gap-2">
-                {Array.from({ length: 90 }, (_, i) => i + 1).map((num) => {
-                  const isCalled = calledNumbers.includes(num)
-                  const isCurrent = num === currentNumber
-                  return (
-                    <div
-                      key={num}
-                      className={`
-                        aspect-square flex items-center justify-center rounded-lg font-semibold text-sm
-                        ${isCurrent
-                          ? 'bg-gray-900 text-white ring-4 ring-gray-300'
-                          : isCalled
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-100 text-gray-400'
-                        }
-                      `}
-                    >
-                      {num}
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="mt-4 text-sm text-gray-600 text-center">
-                {calledNumbers.length} / 90 numbers called
-              </p>
-            </div>
-
             {/* Player Tickets */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                {isHost ? 'All Tickets' : 'My Tickets'}
-              </h3>
-              <div className="space-y-4">
-                {myTickets.length > 0 ? (
-                  myTickets.map((ticket) => (
-                    <Ticket
-                      key={ticket.id}
-                      ticket={ticket.numbers}
-                      ticketNumber={ticket.ticket_number}
-                      markedNumbers={calledNumbers}
-                      size="normal"
-                    />
-                  ))
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-900">
+                  {isHost ? 'Pending Claims' : 'My Tickets'}
+                </h3>
+                {!isHost && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Click on numbers to mark them when called
+                  </p>
+                )}
+              </div>
+              <div className="space-y-6 overflow-x-auto">
+                {isHost ? (
+                  // Host view - show all tickets grouped by player with claims
+                  claimRequests.length > 0 ? (
+                    (() => {
+                      // Group claims by player
+                      const claimsByPlayer = claimRequests.reduce((acc, claim) => {
+                        const playerId = claim.player?.id
+                        if (!acc[playerId]) {
+                          acc[playerId] = {
+                            playerName: claim.player?.player_name,
+                            claims: [],
+                            tickets: []
+                          }
+                        }
+                        acc[playerId].claims.push(claim)
+                        return acc
+                      }, {})
+
+                      return Object.values(claimsByPlayer).map((playerData, index) => (
+                        <div key={index} className="border-2 border-orange-200 bg-orange-50 rounded-lg p-4">
+                          {/* Player header with all their claims inline */}
+                          <div className="mb-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-medium text-gray-900">{playerData.playerName}</h4>
+                              <span className="text-sm text-gray-600">claiming:</span>
+                              {playerData.claims.map((claim) => (
+                                <span
+                                  key={claim.id}
+                                  className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full"
+                                >
+                                  {claim.prize?.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Show all tickets for this player */}
+                          <div className="space-y-3 mb-3">
+                            {playerData.claims[0]?.player?.allTickets?.map((ticket) => (
+                              <Ticket
+                                key={ticket.id}
+                                ticket={ticket.numbers}
+                                ticketNumber={ticket.ticket_number}
+                                markedNumbers={calledNumbers}
+                                size="normal"
+                              />
+                            ))}
+                          </div>
+
+                          {/* Approve/Reject buttons for each claim */}
+                          <div className="space-y-2">
+                            {playerData.claims.map((claim) => (
+                              <div key={claim.id} className="flex gap-2">
+                                <button
+                                  className="flex-1 px-6 py-4 bg-green-600 text-white text-base rounded-lg font-medium hover:bg-green-700 transition-colors"
+                                  onClick={() => handleApproveClaim(claim.id, claim.prize?.id, claim.player?.id)}
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  className="flex-1 px-6 py-4 bg-red-600 text-white text-base rounded-lg font-medium hover:bg-red-700 transition-colors"
+                                  onClick={() => handleRejectClaim(claim.id)}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    })()
+                  ) : (
+                    <p className="text-center text-gray-500 py-8">No pending claims</p>
+                  )
                 ) : (
-                  <p className="text-center text-gray-500 py-8">No tickets selected</p>
+                  // Player view - show only their tickets with manual marking
+                  myTickets.length > 0 ? (
+                    myTickets.map((ticket) => (
+                      <Ticket
+                        key={ticket.id}
+                        ticket={ticket.numbers}
+                        ticketNumber={ticket.ticket_number}
+                        markedNumbers={manuallyMarkedNumbers}
+                        onCellClick={toggleNumberMark}
+                        size="normal"
+                      />
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500 py-8">No tickets selected</p>
+                  )
                 )}
               </div>
             </div>
@@ -273,35 +388,20 @@ function Game() {
 
           {/* Right Column - Controls & Info */}
           <div className="space-y-6">
-            {/* Current Prize */}
-            {currentPrize && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Current Prize</h3>
-                <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg border-2 border-yellow-200">
-                  <p className="text-2xl font-bold text-gray-900">{currentPrize.name}</p>
-                  {currentPrize.amount && (
-                    <p className="text-xl font-semibold text-orange-600 mt-1">{currentPrize.amount}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Player Claim Buttons */}
-            {!isHost && currentPrize && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            {!isHost && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Claim Prize</h3>
                 <div className="space-y-2">
                   {prizes.map((prize) => (
                     <button
                       key={prize.id}
                       onClick={() => handleClaim(prize.id)}
-                      disabled={prize.claimed || prize.id !== currentPrize.id}
+                      disabled={prize.claimed}
                       className={`w-full px-4 py-3 rounded-lg font-medium text-left transition-colors ${
                         prize.claimed
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : prize.id === currentPrize.id
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
                       }`}
                     >
                       <div className="flex justify-between items-center">
@@ -314,55 +414,59 @@ function Game() {
               </div>
             )}
 
-            {/* Prizes Status */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Prizes</h3>
-              <div className="space-y-2">
-                {prizes.map((prize) => (
-                  <div
-                    key={prize.id}
-                    className={`p-3 rounded-lg ${
-                      prize.claimed ? 'bg-gray-50' : 'bg-white border border-gray-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className={`font-medium ${prize.claimed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                          {prize.name}
-                        </p>
-                        {prize.claimed && prize.claimed_by_player?.player_name && (
-                          <p className="text-xs text-gray-500">Won by {prize.claimed_by_player.player_name}</p>
+            {/* Prizes Status - Host only */}
+            {isHost && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Prizes</h3>
+                <div className="space-y-2">
+                  {prizes.map((prize) => (
+                    <div
+                      key={prize.id}
+                      className={`p-3 rounded-lg ${
+                        prize.claimed ? 'bg-gray-50' : 'bg-white border border-gray-200'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className={`font-medium ${prize.claimed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                            {prize.name}
+                          </p>
+                          {prize.claimed && prize.claimed_by_player?.player_name && (
+                            <p className="text-xs text-gray-500">Won by {prize.claimed_by_player.player_name}</p>
+                          )}
+                        </div>
+                        {prize.amount && (
+                          <span className={`font-semibold ${prize.claimed ? 'text-gray-400' : 'text-gray-900'}`}>
+                            {prize.amount}
+                          </span>
                         )}
                       </div>
-                      {prize.amount && (
-                        <span className={`font-semibold ${prize.claimed ? 'text-gray-400' : 'text-gray-900'}`}>
-                          {prize.amount}
-                        </span>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Called Numbers History */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Called Numbers</h3>
-              <div className="flex flex-wrap gap-2">
-                {calledNumbers.slice().reverse().map((num, index) => (
-                  <span
-                    key={num}
-                    className={`px-3 py-1 rounded-full font-semibold text-sm ${
-                      index === 0
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {num}
-                  </span>
-                ))}
+            {/* Called Numbers History - Host only */}
+            {isHost && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Called Numbers</h3>
+                <div className="flex flex-wrap gap-2">
+                  {calledNumbers.slice().reverse().map((num, index) => (
+                    <span
+                      key={num}
+                      className={`px-3 py-1 rounded-full font-semibold text-sm ${
+                        index === 0
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {num}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
