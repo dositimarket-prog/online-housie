@@ -7,7 +7,7 @@ function GameSetup() {
   const [formData, setFormData] = useState({
     hostName: '',
     gameTitle: '',
-    ticketsPerPlayer: 3,
+    ticketsPerPlayer: 2,
     maxPlayers: '',
   })
 
@@ -222,7 +222,7 @@ function GameSetup() {
                     id="ticketsPerPlayer"
                     name="ticketsPerPlayer"
                     min="1"
-                    max="6"
+                    max="2"
                     value={formData.ticketsPerPlayer}
                     onChange={handleInputChange}
                     className="flex-1"

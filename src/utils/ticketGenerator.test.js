@@ -39,37 +39,54 @@ tickets.forEach((ticket, idx) => {
   }
 })
 
-// Test 3: Check number distribution across multiple tickets
-console.log('\n\nTest 3: Check for duplicate numbers across first 6 tickets')
+// Test 3: Check number distribution in consecutive odd-even pairs
+console.log('\n\nTest 3: Check for duplicate numbers in consecutive odd-even pairs')
 const sixTickets = generateTickets(6)
-const numberCounts = {}
 
-sixTickets.forEach((ticket, ticketIdx) => {
+// Check pairs: 1&2, 3&4, 5&6
+const pairs = [
+  [0, 1], // Tickets 1 & 2
+  [2, 3], // Tickets 3 & 4
+  [4, 5]  // Tickets 5 & 6
+]
+
+let allPairsValid = true
+
+pairs.forEach(([idx1, idx2]) => {
+  const ticket1Numbers = new Set()
+  const ticket2Numbers = new Set()
+
+  // Collect numbers from ticket 1
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 9; col++) {
-      const num = ticket.numbers[row][col]
-      if (num !== null) {
-        if (!numberCounts[num]) {
-          numberCounts[num] = []
-        }
-        numberCounts[num].push(ticketIdx + 1)
-      }
+      const num = sixTickets[idx1].numbers[row][col]
+      if (num !== null) ticket1Numbers.add(num)
     }
+  }
+
+  // Collect numbers from ticket 2
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 9; col++) {
+      const num = sixTickets[idx2].numbers[row][col]
+      if (num !== null) ticket2Numbers.add(num)
+    }
+  }
+
+  // Find duplicates
+  const duplicates = [...ticket1Numbers].filter(num => ticket2Numbers.has(num))
+
+  if (duplicates.length === 0) {
+    console.log(`✅ Tickets ${idx1 + 1} & ${idx2 + 1}: No duplicate numbers`)
+  } else {
+    console.log(`❌ Tickets ${idx1 + 1} & ${idx2 + 1}: Found ${duplicates.length} duplicates: ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? '...' : ''}`)
+    allPairsValid = false
   }
 })
 
-const duplicates = Object.entries(numberCounts).filter(([num, tickets]) => tickets.length > 1)
-
-if (duplicates.length === 0) {
-  console.log('✅ No duplicate numbers across first 6 tickets (optimal!)')
+if (allPairsValid) {
+  console.log('\n✅ All consecutive pairs have NO duplicate numbers!')
 } else {
-  console.log(`⚠️  Found ${duplicates.length} numbers used in multiple tickets:`)
-  duplicates.slice(0, 5).forEach(([num, tickets]) => {
-    console.log(`   Number ${num} appears in tickets: ${tickets.join(', ')}`)
-  })
-  if (duplicates.length > 5) {
-    console.log(`   ... and ${duplicates.length - 5} more`)
-  }
+  console.log('\n❌ Some pairs have duplicates - needs fixing')
 }
 
 // Test 4: Test hasNumber function

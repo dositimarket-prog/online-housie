@@ -201,26 +201,40 @@ function shuffleArray(array) {
 }
 
 /**
- * Generate multiple unique tickets with minimal number overlap
+ * Generate multiple unique tickets with no duplicates in consecutive odd-even pairs
+ * Important: Tickets 1&2 share no numbers, 3&4 share no numbers, 5&6 share no numbers, etc.
  * @param {number} count - Number of tickets to generate
  * @returns {Array} Array of ticket objects with id and numbers
  */
 export function generateTickets(count) {
   const tickets = []
-  const usedNumbers = new Set() // Track numbers across all tickets
 
   for (let i = 0; i < count; i++) {
+    const usedNumbers = new Set()
+
+    // For consecutive pairs (0&1, 2&3, 4&5, etc.), ensure no duplicate numbers
+    // Check if this is the second ticket in a pair (odd index: 1, 3, 5, etc.)
+    const isSecondInPair = i % 2 === 1
+
+    if (isSecondInPair && i > 0) {
+      // Get numbers from the previous ticket (the first in this pair)
+      const previousTicket = tickets[i - 1].numbers
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 9; col++) {
+          const num = previousTicket[row][col]
+          if (num !== null) {
+            usedNumbers.add(num)
+          }
+        }
+      }
+    }
+
+    // Generate ticket avoiding numbers from pair partner
     const ticket = generateTicket(usedNumbers)
     tickets.push({
       id: i + 1,
       numbers: ticket
     })
-
-    // Reset usedNumbers every 6 tickets to allow number reuse
-    // (6 tickets × 15 numbers = 90 numbers, which uses all available numbers)
-    if ((i + 1) % 6 === 0) {
-      usedNumbers.clear()
-    }
   }
 
   return tickets

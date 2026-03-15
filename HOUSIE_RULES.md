@@ -74,16 +74,30 @@ Each column is assigned a specific range of numbers:
 
 ## Multiple Tickets in a Game
 
-When generating multiple tickets for the same game:
+### Consecutive Pair Rule (CRITICAL)
+**IMPORTANT**: Consecutive odd-even ticket pairs must have NO duplicate numbers:
+- Tickets 1 & 2: Must share zero numbers
+- Tickets 3 & 4: Must share zero numbers
+- Tickets 5 & 6: Must share zero numbers
+- And so on...
 
-1. **First 6 tickets**: Try to use unique numbers across all tickets
-   - 6 tickets × 15 numbers = 90 numbers (uses entire range 1-90)
+This ensures fair play and prevents conflicts during prize claims.
 
-2. **After 6 tickets**: Reset and allow number reuse
-   - This prevents running out of available numbers
-   - Some overlap is acceptable and expected
+### Number Distribution Strategy
 
-3. **Duplicate minimization**: The generator tracks used numbers and tries to avoid reusing them within each set of 6 tickets
+1. **Odd-even pairs**: Each pair (1&2, 3&4, 5&6, etc.) uses completely different numbers
+   - Each ticket has 15 numbers
+   - Each pair uses up to 30 numbers total
+   - No overlap between tickets in the same pair
+
+2. **Across different pairs**: Numbers may repeat
+   - Ticket 1 and Ticket 3 may share numbers (different pairs)
+   - Ticket 2 and Ticket 4 may share numbers (different pairs)
+   - Only consecutive pairs must have unique numbers
+
+3. **Game setup limit**: Maximum 2 tickets per player
+   - Prevents excessive number conflicts
+   - Ensures better game balance
 
 ## Implementation
 
