@@ -16,7 +16,7 @@ export function generateGameCode() {
  * @returns {Promise<Object>} Created game with code
  */
 export async function createGame(gameData) {
-  const { hostName, gameTitle, ticketsPerPlayer, maxPlayers, prizes } = gameData
+  const { hostName, gameTitle, ticketsPerPlayer, maxPlayers, totalTickets, prizes } = gameData
 
   // Generate unique game code
   const gameCode = generateGameCode()
@@ -32,6 +32,7 @@ export async function createGame(gameData) {
         game_title: gameTitle || null,
         tickets_per_player: ticketsPerPlayer,
         max_players: maxPlayers || null,
+        total_tickets: totalTickets || 20,
         status: 'waiting',
         called_numbers: []
       })

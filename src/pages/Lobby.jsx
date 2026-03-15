@@ -501,6 +501,7 @@ function Lobby() {
         isOpen={showTicketSelector}
         onClose={() => setShowTicketSelector(false)}
         maxTickets={gameData.tickets_per_player}
+        totalTickets={gameData.total_tickets || 20}
         onConfirm={handleTicketsConfirm}
         initialSelected={selectedTickets}
       />

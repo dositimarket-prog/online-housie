@@ -9,6 +9,7 @@ function GameSetup() {
     gameTitle: '',
     ticketsPerPlayer: 2,
     maxPlayers: '',
+    totalTickets: 20,
   })
 
   const [prizes, setPrizes] = useState([
@@ -90,6 +91,14 @@ function GameSetup() {
       newErrors.maxPlayers = 'Max players must be between 2 and 100'
     }
 
+    if (!formData.totalTickets || formData.totalTickets < 2) {
+      newErrors.totalTickets = 'Minimum 2 tickets required'
+    } else if (formData.totalTickets % 2 !== 0) {
+      newErrors.totalTickets = 'Must be an even number (tickets come in pairs)'
+    } else if (formData.totalTickets > 100) {
+      newErrors.totalTickets = 'Maximum 100 tickets allowed'
+    }
+
     const enabledPrizes = prizes.filter(p => p.enabled).length
     if (enabledPrizes === 0) {
       newErrors.prizes = 'Enable at least one prize type'
@@ -113,6 +122,7 @@ function GameSetup() {
         gameTitle: formData.gameTitle,
         ticketsPerPlayer: formData.ticketsPerPlayer,
         maxPlayers: formData.maxPlayers ? parseInt(formData.maxPlayers) : null,
+        totalTickets: parseInt(formData.totalTickets),
         prizes: prizes.filter(p => p.enabled).map(({ name, amount }) => ({
           name,
           amount: amount || null
@@ -254,6 +264,32 @@ function GameSetup() {
                 />
                 {errors.maxPlayers && (
                   <p className="mt-1 text-sm text-red-500">{errors.maxPlayers}</p>
+                )}
+              </div>
+
+              {/* Total Tickets to Generate */}
+              <div>
+                <label htmlFor="totalTickets" className="block text-sm font-medium text-gray-900 mb-2">
+                  Total Tickets to Generate <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  id="totalTickets"
+                  name="totalTickets"
+                  value={formData.totalTickets}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border ${errors.totalTickets ? 'border-red-500' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent`}
+                  placeholder="Enter number of tickets"
+                  min="2"
+                  max="100"
+                  step="2"
+                  required
+                />
+                <p className="mt-2 text-sm text-gray-600">
+                  Tickets are generated in pairs. Enter an even number (minimum 2).
+                </p>
+                {errors.totalTickets && (
+                  <p className="mt-1 text-sm text-red-500">{errors.totalTickets}</p>
                 )}
               </div>
 

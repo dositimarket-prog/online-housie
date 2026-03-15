@@ -5,15 +5,15 @@ import { generateTickets } from '../utils/ticketGenerator'
 /**
  * TicketSelector - Modal for browsing and selecting tickets
  */
-function TicketSelector({ isOpen, onClose, maxTickets, onConfirm, initialSelected = [] }) {
+function TicketSelector({ isOpen, onClose, maxTickets, totalTickets = 20, onConfirm, initialSelected = [] }) {
   const [availableTickets, setAvailableTickets] = useState([])
   const [selectedTickets, setSelectedTickets] = useState(initialSelected)
 
   useEffect(() => {
-    // Generate pool of tickets to choose from (20 tickets)
-    const tickets = generateTickets(20)
+    // Generate pool of tickets to choose from
+    const tickets = generateTickets(totalTickets)
     setAvailableTickets(tickets)
-  }, [])
+  }, [totalTickets])
 
   const handleTicketSelect = (ticket) => {
     // Find the pair partner for this ticket (1&2, 3&4, 5&6, etc.)
