@@ -1,7 +1,7 @@
 # Supabase Realtime Setup
 
 ## Issue
-The app requires manual page refreshes to see updates because Supabase Realtime is not enabled on the database tables.
+The app requires manual page refreshes to see updates. This is usually caused by Row Level Security (RLS) policies blocking realtime subscriptions.
 
 ## What is Realtime?
 Supabase Realtime allows your app to receive instant updates when data changes in the database, without needing to refresh the page. This is essential for:
@@ -12,26 +12,33 @@ Supabase Realtime allows your app to receive instant updates when data changes i
 
 ## Solution
 
-### Option 1: Enable via SQL (Recommended)
+### Step 1: Fix Row Level Security Policies (Most Important!)
+**This is the most common issue** - RLS policies must allow reads for realtime to work.
+
+1. Open your Supabase project dashboard
+2. Go to **SQL Editor**
+3. Run the SQL file: **`supabase-fix-realtime-rls.sql`**
+4. This will:
+   - Enable RLS on all tables (security best practice)
+   - Create policies that allow public read/write access
+   - Verify policies are created correctly
+
+**Note:** The policies allow anonymous access since this is a casual game app. For production apps with sensitive data, you'd want more restrictive policies.
+
+### Step 2: Enable Realtime (If Not Already Enabled)
+
+#### Option A: Check if already enabled
+If you get an error like "relation is already member of publication", skip this step - realtime is already enabled!
+
+#### Option B: Enable via SQL
 1. Open your Supabase project dashboard
 2. Go to **SQL Editor**
 3. Run the SQL file: `supabase-enable-realtime.sql`
-4. This will enable realtime on all necessary tables:
-   - `games` - for game status and called numbers
-   - `players` - for player ready status and ticket selection
-   - `prizes` - for prize claims
-   - `claim_requests` - for claim submissions and approvals
-   - `tickets` - for ticket selection updates
 
-### Option 2: Enable via Dashboard
-1. Open your Supabase project dashboard
-2. Go to **Database** → **Replication**
-3. Find each of these tables and toggle **Enable Realtime**:
-   - `games`
-   - `players`
-   - `prizes`
-   - `claim_requests`
-   - `tickets`
+#### Option C: Enable via Dashboard
+1. Go to **Database** → **Replication**
+2. Toggle **Enable Realtime** for each table:
+   - `games`, `players`, `prizes`, `claim_requests`, `tickets`
 
 ## Verification
 
