@@ -8,7 +8,6 @@ function GameSetup() {
     hostName: '',
     gameTitle: '',
     ticketsPerPlayer: 2,
-    maxPlayers: '',
     totalTickets: 20,
   })
 
@@ -87,10 +86,6 @@ function GameSetup() {
       newErrors.hostName = 'Host name is required'
     }
 
-    if (formData.maxPlayers && (formData.maxPlayers < 2 || formData.maxPlayers > 100)) {
-      newErrors.maxPlayers = 'Max players must be between 2 and 100'
-    }
-
     if (!formData.totalTickets || formData.totalTickets < 2) {
       newErrors.totalTickets = 'Minimum 2 tickets required'
     } else if (formData.totalTickets % 2 !== 0) {
@@ -121,7 +116,6 @@ function GameSetup() {
         hostName: formData.hostName,
         gameTitle: formData.gameTitle,
         ticketsPerPlayer: formData.ticketsPerPlayer,
-        maxPlayers: formData.maxPlayers ? parseInt(formData.maxPlayers) : null,
         totalTickets: parseInt(formData.totalTickets),
         prizes: prizes.filter(p => p.enabled).map(({ name, amount }) => ({
           name,
@@ -244,27 +238,6 @@ function GameSetup() {
                 <p className="mt-2 text-sm text-gray-600">
                   Each player can select up to {formData.ticketsPerPlayer} ticket{formData.ticketsPerPlayer > 1 ? 's' : ''}
                 </p>
-              </div>
-
-              {/* Max Players */}
-              <div>
-                <label htmlFor="maxPlayers" className="block text-sm font-medium text-gray-900 mb-2">
-                  Maximum Players <span className="text-gray-400">(Optional)</span>
-                </label>
-                <input
-                  type="number"
-                  id="maxPlayers"
-                  name="maxPlayers"
-                  value={formData.maxPlayers}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border ${errors.maxPlayers ? 'border-red-500' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent`}
-                  placeholder="Leave empty for unlimited"
-                  min="2"
-                  max="100"
-                />
-                {errors.maxPlayers && (
-                  <p className="mt-1 text-sm text-red-500">{errors.maxPlayers}</p>
-                )}
               </div>
 
               {/* Total Tickets to Generate */}

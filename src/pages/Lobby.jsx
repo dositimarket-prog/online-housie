@@ -257,7 +257,7 @@ function Lobby() {
               <div className="p-6 border-b border-gray-100">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-gray-900">
-                    Players ({players.length}{gameData.max_players ? `/${gameData.max_players}` : ''})
+                    Players ({players.length})
                   </h2>
                   <div className="flex items-center gap-2 text-sm">
                     <div className="flex items-center gap-1 text-green-600">
@@ -356,12 +356,6 @@ function Lobby() {
                   <span className="text-gray-600">Tickets per player</span>
                   <span className="font-medium text-gray-900">{gameData.tickets_per_player}</span>
                 </div>
-                {gameData.max_players && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Max players</span>
-                    <span className="font-medium text-gray-900">{gameData.max_players}</span>
-                  </div>
-                )}
                 <div className="pt-2 border-t border-gray-100">
                   <span className="text-gray-600 block mb-2">Game Mode</span>
                   <div className="space-y-1 text-xs text-gray-600">

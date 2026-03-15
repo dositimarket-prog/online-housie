@@ -16,7 +16,7 @@ export function generateGameCode() {
  * @returns {Promise<Object>} Created game with code
  */
 export async function createGame(gameData) {
-  const { hostName, gameTitle, ticketsPerPlayer, maxPlayers, totalTickets, prizes } = gameData
+  const { hostName, gameTitle, ticketsPerPlayer, totalTickets, prizes } = gameData
 
   // Generate unique game code
   const gameCode = generateGameCode()
@@ -31,7 +31,6 @@ export async function createGame(gameData) {
         host_name: hostName,
         game_title: gameTitle || null,
         tickets_per_player: ticketsPerPlayer,
-        max_players: maxPlayers || null,
         total_tickets: totalTickets || 20,
         status: 'waiting',
         called_numbers: []
@@ -87,7 +86,7 @@ export async function validateGameCode(gameCode) {
   try {
     const { data: game, error } = await supabase
       .from('games')
-      .select('id, game_code, status, max_players, host_name, game_title')
+      .select('id, game_code, status, host_name, game_title')
       .eq('game_code', gameCode)
       .single()
 
@@ -97,18 +96,6 @@ export async function validateGameCode(gameCode) {
 
     if (game.status !== 'waiting') {
       return { valid: false, error: 'Game has already started' }
-    }
-
-    // Check if game is full
-    if (game.max_players) {
-      const { count } = await supabase
-        .from('players')
-        .select('*', { count: 'exact', head: true })
-        .eq('game_id', game.id)
-
-      if (count >= game.max_players) {
-        return { valid: false, error: 'Game is full' }
-      }
     }
 
     return {
