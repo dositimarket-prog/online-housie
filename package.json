@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mobile:setup": "./setup-mobile.sh",
+    "mobile:build": "vite build && npx cap sync",
+    "mobile:ios": "vite build && npx cap sync ios && npx cap open ios",
+    "mobile:android": "vite build && npx cap sync android && npx cap open android"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",
